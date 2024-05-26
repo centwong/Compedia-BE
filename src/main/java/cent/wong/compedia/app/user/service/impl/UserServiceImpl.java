@@ -209,8 +209,6 @@ public class UserServiceImpl implements UserService {
 
         Long now = new Date().getTime();
 
-        req.setIsActive(true);
-
         Mono<User> findUser = this.userRepository.get(req);
 
         Function<User, Mono<BaseResponse<Object>>> processUpdate = (user) -> {
