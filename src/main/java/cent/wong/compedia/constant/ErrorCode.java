@@ -12,7 +12,14 @@ public enum ErrorCode {
     // security error
     AUTHORIZATION_HEADER_REQUIRED("SECURITY-001", "Authorization header is required"),
     JWT_FORMAT_INVALID("SECURITY-002", "Invalid JWT token format"),
-    PARSE_JWT_ERROR("SECURITY-003", "Error when parsing JWT. Please contact IT team");
+    PARSE_JWT_ERROR("SECURITY-003", "Error when parsing JWT. Please contact IT team"),
+
+    // user error
+    ALREADY_GRADUATE_STUDENT_ERROR("STUDENT-001", "Only active students that are allowed to register"),
+    STUDENT_NOT_FOUND_PDDIKTI("STUDENT-002", "Student not found on PDDIKTI"),
+    EMAIL_ALREADY_EXIST("STUDENT-003", "Email already exist"),
+    INVALID_CREDENTIAL("STUDENT-004", "User credential is invalid"),
+    STUDENT_NOT_FOUND("STUDENT-002", "Student not found");
 
     private final String errCode;
 

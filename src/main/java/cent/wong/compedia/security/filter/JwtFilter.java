@@ -1,6 +1,7 @@
 package cent.wong.compedia.security.filter;
 
 import cent.wong.compedia.constant.ErrorCode;
+import cent.wong.compedia.constant.RoleConstant;
 import cent.wong.compedia.entity.BaseResponse;
 import cent.wong.compedia.security.authentication.JwtAuthentication;
 import cent.wong.json.JsonUtil;
@@ -72,10 +73,10 @@ public class JwtFilter implements WebFilter {
                             .parseClaimsJws(header);
                     Claims body = jws.getBody();
                     Authentication authentication = new JwtAuthentication(
-                            body.getId(),
+                            body.get("id"),
                             null,
                             List.of(
-                                    new SimpleGrantedAuthority(String.format("ROLE_%s", body.get("role")))
+                                    new SimpleGrantedAuthority(String.format("ROLE_%s", RoleConstant.getRoleById((int)body.get("role"))))
                             )
                     );
 

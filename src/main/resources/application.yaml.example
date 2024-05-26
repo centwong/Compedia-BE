@@ -1,0 +1,16 @@
+server:
+  port:
+
+spring:
+  datasource:
+    url:
+  r2dbc:
+    url:
+
+springdoc:
+  swagger-ui:
+    path: /swagger/index.html
+  use-fqn: true
+
+jwt:
+  secret:
