@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 @RestController
 @RequiredArgsConstructor
@@ -31,7 +32,8 @@ public class UserController {
             @RequestBody @Valid SaveUserReq req
             ){
         return this.service.save(req)
-                .map(ResponseEntity::ok);
+                .map(ResponseEntity::ok)
+                .subscribeOn(Schedulers.boundedElastic());
     }
 
     @Operation(description = "Login user")
@@ -40,7 +42,8 @@ public class UserController {
             @RequestBody @Valid LoginUserReq req
             ){
         return this.service.login(req)
-                .map(ResponseEntity::ok);
+                .map(ResponseEntity::ok)
+                .subscribeOn(Schedulers.boundedElastic());
     }
 
     @Operation(description = "Get user")
@@ -49,7 +52,8 @@ public class UserController {
             @RequestBody GetUserReq req
     ){
         return this.service.get(req)
-                .map(ResponseEntity::ok);
+                .map(ResponseEntity::ok)
+                .subscribeOn(Schedulers.boundedElastic());
     }
 
     @Operation(description = "Get list of user")
@@ -58,40 +62,44 @@ public class UserController {
             @RequestBody GetUserReq req
     ){
         return this.service.getList(req)
-                .map(ResponseEntity::ok);
+                .map(ResponseEntity::ok)
+                .subscribeOn(Schedulers.boundedElastic());
     }
 
     @Operation(description = "Update user")
     @PostMapping("/private/v1/user/update")
-    public Mono<ResponseEntity<BaseResponse<?>>> update(
+    public Mono<ResponseEntity<BaseResponse<Object>>> update(
             Authentication authentication,
             @RequestBody @Valid UpdateUserReq req
     ){
         GetUserReq getReq = new GetUserReq();
         getReq.setId(Integer.valueOf((int)authentication.getPrincipal()).longValue());
         return this.service.update(getReq, req)
-                .map(ResponseEntity::ok);
+                .map(ResponseEntity::ok)
+                .subscribeOn(Schedulers.boundedElastic());
     }
 
     @Operation(description = "Activate deleted user")
     @PostMapping("/private/v1/user/activate")
-    public Mono<ResponseEntity<BaseResponse<?>>> activate(
+    public Mono<ResponseEntity<BaseResponse<Object>>> activate(
             Authentication authentication
     ){
         GetUserReq getReq = new GetUserReq();
         getReq.setId(Integer.valueOf((int)authentication.getPrincipal()).longValue());
         return this.service.activate(getReq)
-                .map(ResponseEntity::ok);
+                .map(ResponseEntity::ok)
+                .subscribeOn(Schedulers.boundedElastic());
     }
 
     @Operation(description = "Delete user")
     @PostMapping("/private/v1/user/delete")
-    public Mono<ResponseEntity<BaseResponse<?>>> delete(
+    public Mono<ResponseEntity<BaseResponse<Object>>> delete(
             JwtAuthentication authentication
     ){
         GetUserReq getReq = new GetUserReq();
         getReq.setId(Integer.valueOf((int)authentication.getPrincipal()).longValue());
         return this.service.delete(getReq)
-                .map(ResponseEntity::ok);
+                .map(ResponseEntity::ok)
+                .subscribeOn(Schedulers.boundedElastic());
     }
 }
