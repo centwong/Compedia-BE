@@ -101,19 +101,6 @@ public class UserServiceImpl implements UserService {
                 .doOnNext((d) -> log.info("success fetch user from pddikti: {}", jsonUtil.writeValueAsString(d)));
     }
 
-    // you get id from fetchListStudent() method
-    private Mono<GetDetailStudent> fetchStudentDetail(String id){
-        String url = String.format("https://api-frontend.kemdikbud.go.id/detail_mhs/%s", id);
-        log.info("fetching url detail: {}", url);
-        return webclient
-                .baseUrl(url)
-                .build()
-                .get()
-                .retrieve()
-                .bodyToMono(GetDetailStudent.class)
-                .doOnNext((d) -> log.info("success fetch user detail from pddikti: {}", jsonUtil.writeValueAsString(d)));
-    }
-
     @Override
     public Mono<BaseResponse<SaveUserRes>> save(SaveUserReq req) {
         User user = this.userMapper.saveReq(req);
@@ -128,11 +115,6 @@ public class UserServiceImpl implements UserService {
 
         Mono<GetListStudentRes.StudentData> fetchStudentData = this.fetchListStudent(req.getName());
 
-        Function<GetListStudentRes.StudentData, Mono<GetDetailStudent>> fetchStudentDetail = (d) -> {
-              Mono<GetDetailStudent> fetchDetailStudent = this.fetchStudentDetail(d.getWebsiteLink());
-              return fetchDetailStudent;
-        };
-
         Mono<BaseResponse<SaveUserRes>> saveUser = this.userRepository.save(user)
                 .map((data) -> {
                     SaveUserRes res = new SaveUserRes();
@@ -144,15 +126,7 @@ public class UserServiceImpl implements UserService {
                 .map((d) -> BaseResponse.<SaveUserRes>sendError(tracer, ErrorCode.EMAIL_ALREADY_EXIST.getErrCode(), ErrorCode.EMAIL_ALREADY_EXIST.getMessage()))
                 .switchIfEmpty(
                         fetchStudentData
-                                .flatMap(fetchStudentDetail)
-                                .flatMap((data) -> {
-                                    GetDetailStudent.CommonData commonData = data.getDataumum();
-                                    if(commonData.getDateGraduate() != null || commonData.getDiploma() != null || commonData.getStatus() != null){
-                                        return Mono.just(BaseResponse.<SaveUserRes>sendError(tracer, ErrorCode.ALREADY_GRADUATE_STUDENT_ERROR.getErrCode(), ErrorCode.ALREADY_GRADUATE_STUDENT_ERROR.getMessage()));
-                                    } else {
-                                        return saveUser;
-                                    }
-                                })
+                                .then(saveUser)
                                 .switchIfEmpty(Mono.just(BaseResponse.sendError(tracer, ErrorCode.STUDENT_NOT_FOUND_PDDIKTI.getErrCode(), ErrorCode.STUDENT_NOT_FOUND_PDDIKTI.getMessage())))
                 )
                 .onErrorResume((e) -> {
