@@ -145,6 +145,11 @@
 			<groupId>io.r2dbc</groupId>
 			<artifactId>r2dbc-proxy</artifactId>
 		</dependency>
+		<dependency>
+			<groupId>com.midtrans</groupId>
+			<artifactId>java-library</artifactId>
+			<version>3.0.0</version>
+		</dependency>
 	</dependencies>
 
 	<build>
