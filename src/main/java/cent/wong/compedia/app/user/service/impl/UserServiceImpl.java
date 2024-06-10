@@ -1,5 +1,6 @@
 package cent.wong.compedia.app.user.service.impl;
 
+import cent.wong.compedia.app.interest.repository.InterestRepository;
 import cent.wong.compedia.app.user.repository.UserRepository;
 import cent.wong.compedia.app.user.service.UserService;
 import cent.wong.compedia.constant.ErrorCode;
@@ -7,6 +8,7 @@ import cent.wong.compedia.constant.RoleConstant;
 import cent.wong.compedia.entity.BaseResponse;
 import cent.wong.compedia.entity.PaginationRes;
 import cent.wong.compedia.entity.User;
+import cent.wong.compedia.entity.dto.interest.GetInterestReq;
 import cent.wong.compedia.entity.dto.pddikti.GetDetailStudent;
 import cent.wong.compedia.entity.dto.pddikti.GetListStudentRes;
 import cent.wong.compedia.entity.dto.user.*;
@@ -47,6 +49,8 @@ public class UserServiceImpl implements UserService {
     private final UserMapper userMapper = UserMapper.INSTANCE;
 
     private final BCryptPasswordEncoder bcrypt = new BCryptPasswordEncoder();
+
+    private final InterestRepository interestRepository;
 
     @Value("${jwt.secret}")
     private String jwtSecret;
@@ -125,9 +129,7 @@ public class UserServiceImpl implements UserService {
         return findUserByEmail
                 .map((d) -> BaseResponse.<SaveUserRes>sendError(tracer, ErrorCode.EMAIL_ALREADY_EXIST.getErrCode(), ErrorCode.EMAIL_ALREADY_EXIST.getMessage()))
                 .switchIfEmpty(
-                        fetchStudentData
-                                .then(saveUser)
-                                .switchIfEmpty(Mono.just(BaseResponse.sendError(tracer, ErrorCode.STUDENT_NOT_FOUND_PDDIKTI.getErrCode(), ErrorCode.STUDENT_NOT_FOUND_PDDIKTI.getMessage())))
+                        saveUser
                 )
                 .onErrorResume((e) -> {
                     log.error("error occurred with message: {}", e);
@@ -162,6 +164,21 @@ public class UserServiceImpl implements UserService {
                     } else {
                         return BaseResponse.<LoginUserRes>sendError(tracer, ErrorCode.INVALID_CREDENTIAL.getErrCode(), ErrorCode.INVALID_CREDENTIAL.getMessage());
                     }
+                })
+                .flatMap((baseResponse) -> {
+                    LoginUserRes body = baseResponse.getData();
+                    GetInterestReq getInterestReq = new GetInterestReq();
+                    getInterestReq.setFkUserId(body.getId());
+
+                    return interestRepository.get(getInterestReq)
+                            .map((i) -> {
+                                body.setIsAlreadyFillInterestSurvey(true);
+                                return baseResponse;
+                            })
+                            .switchIfEmpty(Mono.fromCallable(() -> {
+                                body.setIsAlreadyFillInterestSurvey(false);
+                                return baseResponse;
+                            }));
                 })
                 .switchIfEmpty(Mono.just(BaseResponse.sendError(tracer, ErrorCode.STUDENT_NOT_FOUND_PDDIKTI.getErrCode(), ErrorCode.STUDENT_NOT_FOUND.getMessage())))
                 .onErrorResume((e) -> {

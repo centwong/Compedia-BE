@@ -12,4 +12,6 @@ public class LoginUserRes implements Serializable {
     private String name;
 
     private String jwtToken;
+
+    private Boolean isAlreadyFillInterestSurvey;
 }
