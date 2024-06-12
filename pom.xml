@@ -120,6 +120,23 @@
 			<version>1.0-SNAPSHOT</version>
 		</dependency>
 		<dependency>
+			<groupId>com.fasterxml.jackson.core</groupId>
+			<artifactId>jackson-core</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>io.asyncer</groupId>
+			<artifactId>r2dbc-mysql</artifactId>
+			<version>1.1.0</version>
+		</dependency>
+		<dependency>
+			<groupId>com.fasterxml.jackson.core</groupId>
+			<artifactId>jackson-databind</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>com.fasterxml.jackson.core</groupId>
+			<artifactId>jackson-annotations</artifactId>
+		</dependency>
+		<dependency>
 			<groupId>cent.wong</groupId>
 			<artifactId>common-class</artifactId>
 			<version>1.0-SNAPSHOT</version>
@@ -141,14 +158,19 @@
 			<version>0.11.5</version>
 			<scope>runtime</scope>
 		</dependency>
-		<dependency>
-			<groupId>io.r2dbc</groupId>
-			<artifactId>r2dbc-proxy</artifactId>
-		</dependency>
+<!--		<dependency>-->
+<!--			<groupId>io.r2dbc</groupId>-->
+<!--			<artifactId>r2dbc-proxy</artifactId>-->
+<!--		</dependency>-->
 		<dependency>
 			<groupId>com.midtrans</groupId>
 			<artifactId>java-library</artifactId>
 			<version>3.0.0</version>
+		</dependency>
+		<dependency>
+			<groupId>com.cloudinary</groupId>
+			<artifactId>cloudinary-http44</artifactId>
+			<version>1.32.2</version>
 		</dependency>
 	</dependencies>
 

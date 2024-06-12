@@ -19,7 +19,10 @@ public enum ErrorCode {
     STUDENT_NOT_FOUND_PDDIKTI("STUDENT-002", "Student not found on PDDIKTI"),
     EMAIL_ALREADY_EXIST("STUDENT-003", "Email already exist"),
     INVALID_CREDENTIAL("STUDENT-004", "User credential is invalid"),
-    STUDENT_NOT_FOUND("STUDENT-002", "Student not found");
+    STUDENT_NOT_FOUND("STUDENT-005", "Student not found"),
+
+    // competition error
+    COMPETITION_NOT_FOUND("COMPETITION-001", "Competition not found");
 
     private final String errCode;
 
