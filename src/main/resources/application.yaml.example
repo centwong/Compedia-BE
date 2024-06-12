@@ -14,3 +14,12 @@ springdoc:
 
 jwt:
   secret:
+
+midtrans:
+  client-key:
+  secret-key:
+
+cloudinary:
+  api-key:
+  api-secret:
+  name:

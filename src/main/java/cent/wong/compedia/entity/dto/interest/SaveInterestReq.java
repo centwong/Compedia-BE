@@ -9,12 +9,12 @@ import java.util.List;
 @Data
 public class SaveInterestReq implements Serializable {
 
-    @NotNull(message = "fkInterestTypeIds should not null")
+    @NotNull(message = "FkInterestTypeIds should not null")
     private List<Long> fkInterestTypeIds;
 
-    @NotNull(message = "fkInterestTimeIds should not null")
+    @NotNull(message = "FkInterestTimeIds should not null")
     private List<Long> fkInterestTimeIds;
 
-    @NotNull(message = "fkInterestRangePriceIds should not null")
+    @NotNull(message = "FkInterestRangePriceIds should not null")
     private List<Long> fkInterestRangePriceIds;
 }

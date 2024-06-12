@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import java.util.List;
 
@@ -38,27 +39,31 @@ public class InterestController {
             @RequestBody @Valid SaveInterestReq req
             ){
         return this.interestService.save(authentication, req)
-                .map(ResponseEntity::ok);
+                .map(ResponseEntity::ok)
+                .subscribeOn(Schedulers.boundedElastic());
     }
 
     @PostMapping("/type/list")
     @Operation(description = "Get all interest type")
     public Mono<ResponseEntity<BaseResponse<List<InterestType>>>> getAllInterestType(){
         return this.interestService.getAllInterestType()
-                .map(ResponseEntity::ok);
+                .map(ResponseEntity::ok)
+                .subscribeOn(Schedulers.boundedElastic());
     }
 
     @PostMapping("/time/list")
     @Operation(description = "Get all interest time")
     public Mono<ResponseEntity<BaseResponse<List<InterestTime>>>> getAllInterestTime(){
         return this.interestService.getAllInterestTime()
-                .map(ResponseEntity::ok);
+                .map(ResponseEntity::ok)
+                .subscribeOn(Schedulers.boundedElastic());
     }
 
     @PostMapping("/range-price/list")
     @Operation(description = "Get all interest range price")
     public Mono<ResponseEntity<BaseResponse<List<InterestRangePrice>>>> getAllInterestRangePrice(){
         return this.interestService.getAllInterestRangePrice()
-                .map(ResponseEntity::ok);
+                .map(ResponseEntity::ok)
+                .subscribeOn(Schedulers.boundedElastic());
     }
 }
