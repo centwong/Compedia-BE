@@ -5,6 +5,7 @@ import cent.wong.compedia.entity.BaseResponse;
 import cent.wong.compedia.entity.Competition;
 import cent.wong.compedia.entity.PaginationRes;
 import cent.wong.compedia.entity.dto.competition.GetCompetitionReq;
+import cent.wong.compedia.entity.dto.competition.GetCompetitionRes;
 import cent.wong.compedia.entity.dto.competition.SaveUpdateCompetitionReq;
 import cent.wong.compedia.entity.dto.competition.SaveUpdateCompetitionRes;
 import io.swagger.v3.oas.annotations.Operation;
@@ -47,7 +48,7 @@ public class CompetitionController {
 
     @PostMapping("/v1/competition/get")
     @Operation(description = "Get competition")
-    public Mono<ResponseEntity<BaseResponse<Competition>>> get(
+    public Mono<ResponseEntity<BaseResponse<GetCompetitionRes>>> get(
             @RequestBody GetCompetitionReq req
             ){
         return this.competitionService.get(req)
@@ -57,7 +58,7 @@ public class CompetitionController {
 
     @PostMapping("/v1/competition/get/list")
     @Operation(description = "Get list competition")
-    public Mono<ResponseEntity<BaseResponse<PaginationRes<Competition>>>> getList(
+    public Mono<ResponseEntity<BaseResponse<PaginationRes<GetCompetitionRes>>>> getList(
             @RequestBody GetCompetitionReq req
     ){
         return this.competitionService.getList(req)
