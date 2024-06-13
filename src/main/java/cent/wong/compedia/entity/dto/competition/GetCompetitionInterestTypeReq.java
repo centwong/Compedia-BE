@@ -8,7 +8,7 @@ import java.io.Serializable;
 import java.util.List;
 
 @Data
-public class GetCompetitionReq implements Serializable {
+public class GetCompetitionInterestTypeReq implements Serializable {
 
     @ParamColumn(name = "id")
     private Long id;
@@ -16,18 +16,17 @@ public class GetCompetitionReq implements Serializable {
     @ParamColumn(name = "id")
     private List<Long> ids;
 
+    @ParamColumn(name = "fk_competition_id")
+    private Long fkCompetitionId;
+
+    @ParamColumn(name = "fk_competition_id")
+    private List<Long> fkCompetitionIds;
+
+    @ParamColumn(name = "fk_interest_type_id")
     private Long fkInterestTypeId;
 
+    @ParamColumn(name = "fk_interest_type_id")
     private List<Long> fkInterestTypeIds;
-
-    @ParamColumn(name = "fk_interest_time_id")
-    private Long fkInterestTimeId;
-
-    @ParamColumn(name = "fk_interest_time_id")
-    private List<Long> fkInterestTimeIds;
-
-    @ParamColumn(name = "is_active")
-    private Boolean isActive;
 
     private Pagination.PaginationParam pgParam = new Pagination.PaginationParam();
 }

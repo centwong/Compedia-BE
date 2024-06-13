@@ -2,17 +2,16 @@ package cent.wong.compedia.app.competition.service.impl;
 
 import cent.wong.compedia.app.competition.repository.CompetitionRepository;
 import cent.wong.compedia.app.competition.service.CompetitionService;
+import cent.wong.compedia.app.interest.repository.CompetitionInterestTypeRepository;
+import cent.wong.compedia.app.interest.repository.InterestRepository;
+import cent.wong.compedia.constant.ColorConstant;
 import cent.wong.compedia.constant.ErrorCode;
-import cent.wong.compedia.entity.BaseResponse;
-import cent.wong.compedia.entity.CloudinaryResponse;
-import cent.wong.compedia.entity.Competition;
-import cent.wong.compedia.entity.PaginationRes;
-import cent.wong.compedia.entity.dto.competition.GetCompetitionReq;
-import cent.wong.compedia.entity.dto.competition.SaveUpdateCompetitionReq;
-import cent.wong.compedia.entity.dto.competition.SaveUpdateCompetitionRes;
+import cent.wong.compedia.entity.*;
+import cent.wong.compedia.entity.dto.competition.*;
 import cent.wong.compedia.mapper.CompetitionMapper;
 import cent.wong.compedia.util.AuthenticationUtil;
 import cent.wong.compedia.util.CloudinaryUtil;
+import cent.wong.compedia.util.DateUtil;
 import cent.wong.json.JsonUtil;
 import com.cloudinary.Cloudinary;
 import com.cloudinary.utils.ObjectUtils;
@@ -25,12 +24,17 @@ import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.util.function.Tuple2;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -51,6 +55,12 @@ public class CompetitionServiceImpl implements CompetitionService {
     private final Cloudinary cloudinary;
 
     private final JsonUtil jsonUtil;
+
+    private final DateUtil dateUtil;
+
+    private final InterestRepository interestRepository;
+
+    private final CompetitionInterestTypeRepository competitionInterestRepository;
 
     @Override
     public Mono<BaseResponse<SaveUpdateCompetitionRes>> save(Authentication authentication, SaveUpdateCompetitionReq req, Mono<FilePart> file) {
@@ -82,6 +92,17 @@ public class CompetitionServiceImpl implements CompetitionService {
                             competition.setImage(cloudinaryResponse.getSecureUrl());
                             competition.setImageId(cloudinaryResponse.getPublicId());
                             return this.competitionRepository.save(competition)
+                                    .zipWhen((savedCompetition) ->
+                                            Flux.fromIterable(req.getFkInterestTypeIds())
+                                                    .flatMap((interestId) -> {
+                                                        CompetitionInterestType competitionInterestType = new CompetitionInterestType();
+                                                        competitionInterestType.setFkCompetitionId(competition.getId());
+                                                        competitionInterestType.setFkInterestTypeId(interestId);
+                                                        return this.competitionInterestRepository.save(competitionInterestType);
+                                                    })
+                                                    .collectList()
+                                    )
+                                    .map(Tuple2::getT1)
                                     .map((data) -> BaseResponse.<SaveUpdateCompetitionRes>sendSuccess(tracer));
                         }
                 )
@@ -92,12 +113,42 @@ public class CompetitionServiceImpl implements CompetitionService {
     }
 
     @Override
-    public Mono<BaseResponse<Competition>> get(GetCompetitionReq req) {
+    public Mono<BaseResponse<GetCompetitionRes>> get(GetCompetitionReq req) {
+        GetCompetitionInterestTypeReq getCompetitionInterestTypeReq = new GetCompetitionInterestTypeReq();
+        getCompetitionInterestTypeReq.setFkCompetitionId(req.getId());
+        getCompetitionInterestTypeReq.setFkCompetitionIds(req.getFkInterestTypeIds());
+
+        Mono<List<CompetitionInterestType>> competitionInterestTypeList = this.competitionInterestRepository
+                        .getList(getCompetitionInterestTypeReq);
+
         req.setIsActive(true);
-        return this.competitionRepository.get(req)
+
+        return  competitionInterestTypeList.map((competitionInterestType) -> competitionInterestType.stream().map(CompetitionInterestType::getFkCompetitionId).toList())
+                .flatMap((listFkCompetitionId) -> {
+                    req.setIds(listFkCompetitionId);
+                    return this.competitionRepository.get(req);
+                })
                 .map((data) -> {
                     data.setFkInterestTypeId(jsonUtil.readValue(data.getFkInterestTypeIds(), new TypeReference<List<Long>>() {}));
                     return data;
+                })
+                .flatMap((competition) -> {
+                    // find interest time first
+                    Mono<List<InterestTime>> time = this.interestRepository.getAllInterestTime();
+
+                    // find interest type too
+                    Mono<List<InterestType>> type = this.interestRepository.getAllInterestType();
+
+                    return time.zipWith(type)
+                            .map((t2) -> {
+                                List<InterestTime> interestTimes = t2.getT1();
+                                List<InterestType> interestTypes = t2.getT2();
+                                return convertFromCompetition(
+                                        competition,
+                                        interestTypes,
+                                        interestTimes
+                                );
+                            });
                 })
                 .map((data) -> BaseResponse.sendSuccess(tracer, data))
                 .switchIfEmpty(Mono.just(BaseResponse.sendSuccess(tracer)))
@@ -107,15 +158,103 @@ public class CompetitionServiceImpl implements CompetitionService {
                 });
     }
 
+    // TODO: the logic is not efficient, change the algorithm later!
+    private GetCompetitionRes convertFromCompetition(
+            Competition competition,
+            List<InterestType> interestTypes,
+            List<InterestTime> interestTimes
+    ){
+        GetCompetitionRes res = new GetCompetitionRes();
+        res.setId(competition.getId());
+        res.setImage(competition.getImage());
+        res.setName(competition.getName());
+        res.setDeadline(dateUtil.convertIntoString(competition.getDeadline()));
+        res.setPrice(competition.getPrice());
+
+        interestTimes.forEach((times) -> {
+            if(times.getId() == competition.getFkInterestTimeId()){
+                res.setLocation(times.getTime());
+            }
+        });
+
+        List<String> resType = new ArrayList<>();
+
+        competition.getFkInterestTypeId()
+                .forEach((types) -> {
+                    interestTypes.forEach((interestType) -> {
+                        if(types == interestType.getId()){
+                            resType.add(interestType.getType());
+                        }
+                    });
+                });
+
+        res.setType(resType);
+
+        Instant deadline = Instant.ofEpochMilli(competition.getDeadline());
+        Instant now = Instant.now();
+
+        if(deadline.isBefore(now)){
+            res.setDaySinceDeadline("Sudah Tutup");
+            res.setDaySinceDeadlineColor(ColorConstant.RED);
+        } else {
+            Long differenceDay = ChronoUnit.DAYS.between(deadline, now) / -1;
+            res.setDaySinceDeadline(String.valueOf(differenceDay));
+
+            // TODO: set the color of the deadline
+            res.setDaySinceDeadlineColor(null);
+        }
+
+        return res;
+    }
+
     @Override
-    public Mono<BaseResponse<PaginationRes<Competition>>> getList(GetCompetitionReq req) {
+    public Mono<BaseResponse<PaginationRes<GetCompetitionRes>>> getList(GetCompetitionReq req) {
+
+        GetCompetitionInterestTypeReq getCompetitionInterestTypeReq = new GetCompetitionInterestTypeReq();
+        getCompetitionInterestTypeReq.setFkCompetitionId(req.getId());
+        getCompetitionInterestTypeReq.setIds(req.getIds());
+        getCompetitionInterestTypeReq.setFkInterestTypeId(req.getFkInterestTypeId());
+        getCompetitionInterestTypeReq.setFkInterestTypeIds(req.getFkInterestTypeIds());
+
+        Mono<List<CompetitionInterestType>> competitionInterestTypeList = this.competitionInterestRepository
+                .getList(getCompetitionInterestTypeReq);
+
         req.setIsActive(true);
-        return this.competitionRepository.getList(req)
+        return competitionInterestTypeList.map((competitionInterestType) -> competitionInterestType.stream().map(CompetitionInterestType::getFkCompetitionId).toList())
+                .flatMap((listFkCompetitionId) -> {
+                    req.setIds(listFkCompetitionId);
+                    return this.competitionRepository.getList(req);
+                })
                 .map((data) -> {
                     data.getList().forEach((competition) -> {
                         competition.setFkInterestTypeId(jsonUtil.readValue(competition.getFkInterestTypeIds(), new TypeReference<List<Long>>() {}));
                     });
                     return data;
+                })
+                .flatMap((data) -> {
+                    // find interest time first
+                    Mono<List<InterestTime>> time = this.interestRepository.getAllInterestTime();
+
+                    // find interest type too
+                    Mono<List<InterestType>> type = this.interestRepository.getAllInterestType();
+
+                    return time.zipWith(type)
+                            .map((t2) -> {
+                                List<InterestTime> interestTimes = t2.getT1();
+                                List<InterestType> interestTypes = t2.getT2();
+                                List<Competition> listCompetition = data.getList();
+
+                                List<GetCompetitionRes> getRes = listCompetition
+                                        .stream()
+                                        .map((competition) -> convertFromCompetition(competition, interestTypes, interestTimes))
+                                        .collect(Collectors.toList());
+
+                                return PaginationRes
+                                        .<GetCompetitionRes>builder()
+                                        .pg(data.getPg())
+                                        .list(getRes)
+                                        .build();
+                            });
                 })
                 .map((data) -> BaseResponse.sendSuccess(tracer, data))
                 .switchIfEmpty(Mono.just(BaseResponse.sendSuccess(tracer)))

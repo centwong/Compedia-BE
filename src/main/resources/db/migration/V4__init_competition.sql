@@ -20,3 +20,10 @@ CREATE TABLE IF NOT EXISTS `competition`(
     is_active BOOLEAN
 ) ENGINE = INNODB;
 CREATE INDEX `competition_index` ON `competition`(fk_interest_type_ids, image_id, fk_user_id, fk_interest_time_id, is_active);
+
+CREATE TABLE IF NOT EXISTS `competition_interest_type`(
+    id BIGINT PRIMARY KEY NOT NULL AUTO_INCREMENT,
+    fk_competition_id BIGINT NOT NULL,
+    fk_interest_type_id BIGINT NOT NULL
+) ENGINE = INNODB;
+CREATE INDEX `competition_interest_type_index` ON `competition_interest_type`(fk_competition_id, fk_interest_type_id);
