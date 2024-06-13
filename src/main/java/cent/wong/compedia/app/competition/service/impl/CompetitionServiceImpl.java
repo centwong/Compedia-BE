@@ -116,7 +116,9 @@ public class CompetitionServiceImpl implements CompetitionService {
     public Mono<BaseResponse<GetCompetitionRes>> get(GetCompetitionReq req) {
         GetCompetitionInterestTypeReq getCompetitionInterestTypeReq = new GetCompetitionInterestTypeReq();
         getCompetitionInterestTypeReq.setFkCompetitionId(req.getId());
-        getCompetitionInterestTypeReq.setFkCompetitionIds(req.getFkInterestTypeIds());
+        getCompetitionInterestTypeReq.setIds(req.getIds());
+        getCompetitionInterestTypeReq.setFkInterestTypeId(req.getFkInterestTypeId());
+        getCompetitionInterestTypeReq.setFkInterestTypeIds(req.getFkInterestTypeIds());
 
         Mono<List<CompetitionInterestType>> competitionInterestTypeList = this.competitionInterestRepository
                         .getList(getCompetitionInterestTypeReq);
