@@ -84,12 +84,7 @@ public class SurveyServiceImpl implements SurveyService {
     public Mono<BaseResponse<Persona>> savePersona(Authentication authentication, CreatePersonaReq req) {
         String strReq = jsonUtil.writeValueAsString(req);
         log.info("accepting save persona req: {}", strReq);
-        PersonaEnum personaEnum = this.aiService.anaylzePersona(strReq);
         Long id = authenticationUtil.extractId(authentication);
-
-        Persona persona = new Persona();
-        persona.setPersona(personaEnum.getPersona());
-        persona.setFkUserId(id);
 
         // make the example to fetched first
         Persona getPersonaReq = new Persona();
@@ -107,7 +102,14 @@ public class SurveyServiceImpl implements SurveyService {
                     getPersona.setPersona(newPersona.getPersona());
                     return this.personaRepository.save(getPersona);
                 })
-                .switchIfEmpty(this.personaRepository.save(persona))
+                .switchIfEmpty(Mono.fromCallable(() -> {
+                    PersonaEnum personaEnum = this.aiService.anaylzePersona(strReq);
+                    Persona persona = new Persona();
+                    persona.setPersona(personaEnum.getPersona());
+                    persona.setFkUserId(id);
+
+                    return this.personaRepository.save(persona);
+                }).flatMap((d) -> d))
                 .map((savedPersona) -> BaseResponse.sendSuccess(tracer, savedPersona))
                 .onErrorResume((e) -> {
                     log.error("error occurred with message: {}", e);;
