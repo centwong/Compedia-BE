@@ -1,10 +1,8 @@
 package cent.wong.compedia.mapper;
 
+import cent.wong.compedia.entity.MentorData;
 import cent.wong.compedia.entity.User;
-import cent.wong.compedia.entity.dto.user.GetUserRes;
-import cent.wong.compedia.entity.dto.user.LoginUserReq;
-import cent.wong.compedia.entity.dto.user.SaveUserReq;
-import cent.wong.compedia.entity.dto.user.UpdateUserReq;
+import cent.wong.compedia.entity.dto.user.*;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
@@ -28,4 +26,6 @@ public interface UserMapper {
             nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.SET_TO_NULL
     )
     User updateUser(UpdateUserReq req, @MappingTarget User user);
+
+    MentorData saveMentorData(SaveMentorDataReq req);
 }

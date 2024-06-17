@@ -120,6 +120,7 @@ public class CompetitionServiceImpl implements CompetitionService {
 
     @Override
     public Mono<BaseResponse<GetCompetitionDetailRes>> get(GetCompetitionReq req) {
+        req.getPgParam().setLimit(1);
         GetCompetitionInterestTypeReq getCompetitionInterestTypeReq = new GetCompetitionInterestTypeReq();
         getCompetitionInterestTypeReq.setFkCompetitionId(req.getId());
         getCompetitionInterestTypeReq.setIds(req.getIds());

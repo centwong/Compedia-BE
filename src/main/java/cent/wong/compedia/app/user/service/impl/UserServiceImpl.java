@@ -1,13 +1,12 @@
 package cent.wong.compedia.app.user.service.impl;
 
 import cent.wong.compedia.app.interest.repository.InterestRepository;
+import cent.wong.compedia.app.survey.repository.PersonaRepository;
 import cent.wong.compedia.app.user.repository.UserRepository;
 import cent.wong.compedia.app.user.service.UserService;
 import cent.wong.compedia.constant.ErrorCode;
 import cent.wong.compedia.constant.RoleConstant;
-import cent.wong.compedia.entity.BaseResponse;
-import cent.wong.compedia.entity.PaginationRes;
-import cent.wong.compedia.entity.User;
+import cent.wong.compedia.entity.*;
 import cent.wong.compedia.entity.dto.interest.GetInterestReq;
 import cent.wong.compedia.entity.dto.pddikti.GetDetailStudent;
 import cent.wong.compedia.entity.dto.pddikti.GetListStudentRes;
@@ -21,8 +20,10 @@ import io.micrometer.tracing.Tracer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Example;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
@@ -33,7 +34,7 @@ import java.util.Date;
 import java.util.function.Function;
 
 @Service
-@Transactional
+@Transactional(propagation = Propagation.REQUIRES_NEW)
 @Slf4j
 @RequiredArgsConstructor
 public class UserServiceImpl implements UserService {
@@ -51,6 +52,8 @@ public class UserServiceImpl implements UserService {
     private final BCryptPasswordEncoder bcrypt = new BCryptPasswordEncoder();
 
     private final InterestRepository interestRepository;
+
+    private final PersonaRepository personaRepository;
 
     @Value("${jwt.secret}")
     private String jwtSecret;
@@ -142,6 +145,7 @@ public class UserServiceImpl implements UserService {
 
         GetUserReq getReq = new GetUserReq();
         getReq.setEmail(req.getEmail());
+
         Mono<User> fetchUser = this.userRepository
                 .get(getReq);
 
@@ -170,7 +174,7 @@ public class UserServiceImpl implements UserService {
                     GetInterestReq getInterestReq = new GetInterestReq();
                     getInterestReq.setFkUserId(body.getId());
 
-                    return interestRepository.get(getInterestReq)
+                    Mono<BaseResponse<LoginUserRes>> getInterest = interestRepository.get(getInterestReq)
                             .map((i) -> {
                                 body.setIsAlreadyFillInterestSurvey(true);
                                 return baseResponse;
@@ -179,6 +183,23 @@ public class UserServiceImpl implements UserService {
                                 body.setIsAlreadyFillInterestSurvey(false);
                                 return baseResponse;
                             }));
+
+                    Persona dataExample = new Persona();
+                    dataExample.setFkUserId(body.getId());
+                    Example<Persona> examplePersona = Example.of(dataExample);
+                    Mono<BaseResponse<LoginUserRes>> getPersona = this.personaRepository.findOne(examplePersona)
+                            .map((persona) -> {
+                                body.setIsAlreadyFillPersonaSurvey(true);
+                                return baseResponse;
+                            })
+                            .switchIfEmpty(
+                                    Mono.fromCallable(() -> {
+                                      body.setIsAlreadyFillPersonaSurvey(false);
+                                      return baseResponse;
+                                    })
+                            );
+
+                    return getInterest.then(getPersona);
                 })
                 .switchIfEmpty(Mono.just(BaseResponse.sendError(tracer, ErrorCode.STUDENT_NOT_FOUND_PDDIKTI.getErrCode(), ErrorCode.STUDENT_NOT_FOUND.getMessage())))
                 .onErrorResume((e) -> {
@@ -237,7 +258,11 @@ public class UserServiceImpl implements UserService {
 
         return findUser
                 .flatMap(processUpdate)
-                .switchIfEmpty(Mono.just(BaseResponse.sendError(tracer, ErrorCode.STUDENT_NOT_FOUND_PDDIKTI.getErrCode(), ErrorCode.STUDENT_NOT_FOUND.getMessage())));
+                .switchIfEmpty(Mono.just(BaseResponse.sendError(tracer, ErrorCode.STUDENT_NOT_FOUND_PDDIKTI.getErrCode(), ErrorCode.STUDENT_NOT_FOUND.getMessage())))
+                .onErrorResume((e) -> {
+                    log.error("error occurred with message: {}", e);
+                    return Mono.just(BaseResponse.sendError(tracer, ErrorCode.INTERNAL_SERVER_ERROR.getErrCode(), e.getMessage()));
+                });
     }
 
     @Override

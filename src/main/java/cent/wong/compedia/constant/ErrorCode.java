@@ -22,7 +22,10 @@ public enum ErrorCode {
     STUDENT_NOT_FOUND("STUDENT-005", "Student not found"),
 
     // competition error
-    COMPETITION_NOT_FOUND("COMPETITION-001", "Competition not found");
+    COMPETITION_NOT_FOUND("COMPETITION-001", "Competition not found"),
+
+    // mentor data error
+    MENTOR_DATA_NOT_FOUND("MENTOR-DATA-001", "Mentor data not found");
 
     private final String errCode;
 

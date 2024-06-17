@@ -5,7 +5,8 @@ import lombok.Getter;
 @Getter
 public enum RoleConstant {
     USER(1, "User"),
-    MENTOR(2, "Mentor");
+    MENTOR(2, "Mentor"),
+    SUPER_ADMIN(3, "SuperAdmin");
 
     private final int id;
 
