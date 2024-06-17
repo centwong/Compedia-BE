@@ -1,15 +1,21 @@
 package cent.wong.compedia.app.survey.service.impl;
 
+import cent.wong.compedia.app.ai.AIService;
 import cent.wong.compedia.app.interest.repository.InterestRepository;
+import cent.wong.compedia.app.survey.repository.PersonaRepository;
 import cent.wong.compedia.app.survey.service.SurveyService;
 import cent.wong.compedia.constant.ErrorCode;
-import cent.wong.compedia.entity.BaseResponse;
-import cent.wong.compedia.entity.InterestRangePrice;
-import cent.wong.compedia.entity.InterestTime;
-import cent.wong.compedia.entity.InterestType;
+import cent.wong.compedia.entity.*;
+import cent.wong.compedia.entity.dto.survey.CreatePersonaReq;
+import cent.wong.compedia.util.AuthenticationUtil;
+import cent.wong.json.JsonUtil;
 import io.micrometer.tracing.Tracer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.data.domain.Example;
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Mono;
@@ -27,6 +33,14 @@ public class SurveyServiceImpl implements SurveyService {
     private final Tracer tracer;
 
     private final InterestRepository interestRepository;
+
+    private final PersonaRepository personaRepository;
+
+    private final AIService aiService;
+
+    private final JsonUtil jsonUtil;
+
+    private final AuthenticationUtil authenticationUtil;
 
     @Override
     public Mono<BaseResponse<Map<String, List<?>>>> getSurveyQuestion() {
@@ -60,5 +74,66 @@ public class SurveyServiceImpl implements SurveyService {
             log.error("error occurred with message: {}", e);;
             return Mono.just(BaseResponse.sendError(tracer, ErrorCode.INTERNAL_SERVER_ERROR.getErrCode(), ErrorCode.INTERNAL_SERVER_ERROR.getMessage()));
         });
+    }
+
+    @CacheEvict(
+            value = "persona:get",
+            allEntries = true
+    )
+    @Override
+    public Mono<BaseResponse<Persona>> savePersona(Authentication authentication, CreatePersonaReq req) {
+        String strReq = jsonUtil.writeValueAsString(req);
+        log.info("accepting save persona req: {}", strReq);
+        PersonaEnum personaEnum = this.aiService.anaylzePersona(strReq);
+        Long id = authenticationUtil.extractId(authentication);
+
+        Persona persona = new Persona();
+        persona.setPersona(personaEnum.getPersona());
+        persona.setFkUserId(id);
+
+        // make the example to fetched first
+        Persona getPersonaReq = new Persona();
+        getPersonaReq.setFkUserId(id);
+        Example<Persona> examplePersona = Example.of(
+                getPersonaReq
+        );
+
+        return this.personaRepository
+                .findOne(
+                        examplePersona
+                )
+                .flatMap((getPersona) -> {
+                    PersonaEnum newPersona = this.aiService.anaylzePersona(strReq);
+                    getPersona.setPersona(newPersona.getPersona());
+                    return this.personaRepository.save(getPersona);
+                })
+                .switchIfEmpty(this.personaRepository.save(persona))
+                .map((savedPersona) -> BaseResponse.sendSuccess(tracer, savedPersona))
+                .onErrorResume((e) -> {
+                    log.error("error occurred with message: {}", e);;
+                    return Mono.just(BaseResponse.sendError(tracer, ErrorCode.INTERNAL_SERVER_ERROR.getErrCode(), ErrorCode.INTERNAL_SERVER_ERROR.getMessage()));
+                });
+    }
+
+    @Cacheable("persona:get")
+    @Override
+    public Mono<BaseResponse<Persona>> get(Authentication authentication) {
+        Long userId = authenticationUtil.extractId(authentication);
+        log.info("accepting get persona from userId: {}", userId);
+
+        // make the example to fetched first
+        Persona getPersonaReq = new Persona();
+        getPersonaReq.setFkUserId(userId);
+        Example<Persona> examplePersona = Example.of(
+                getPersonaReq
+        );
+
+        return this.personaRepository.findOne(examplePersona)
+                .map((persona) -> BaseResponse.sendSuccess(tracer, persona))
+                .switchIfEmpty(Mono.just(BaseResponse.sendSuccess(tracer)))
+                .onErrorResume((e) -> {
+                    log.error("error occurred with message: {}", e);
+                    return Mono.just(BaseResponse.sendError(tracer, ErrorCode.INTERNAL_SERVER_ERROR.getErrCode(), ErrorCode.INTERNAL_SERVER_ERROR.getMessage()));
+                });
     }
 }
