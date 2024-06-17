@@ -23,3 +23,8 @@ cloudinary:
   api-key:
   api-secret:
   name:
+
+langchain4j:
+  open-ai:
+    chat-model:
+      api-key:

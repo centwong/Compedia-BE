@@ -4,10 +4,7 @@ import cent.wong.compedia.app.competition.service.CompetitionService;
 import cent.wong.compedia.entity.BaseResponse;
 import cent.wong.compedia.entity.Competition;
 import cent.wong.compedia.entity.PaginationRes;
-import cent.wong.compedia.entity.dto.competition.GetCompetitionReq;
-import cent.wong.compedia.entity.dto.competition.GetCompetitionRes;
-import cent.wong.compedia.entity.dto.competition.SaveUpdateCompetitionReq;
-import cent.wong.compedia.entity.dto.competition.SaveUpdateCompetitionRes;
+import cent.wong.compedia.entity.dto.competition.*;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -48,7 +45,7 @@ public class CompetitionController {
 
     @PostMapping("/v1/competition/get")
     @Operation(description = "Get competition")
-    public Mono<ResponseEntity<BaseResponse<GetCompetitionRes>>> get(
+    public Mono<ResponseEntity<BaseResponse<GetCompetitionDetailRes>>> get(
             @RequestBody GetCompetitionReq req
             ){
         return this.competitionService.get(req)

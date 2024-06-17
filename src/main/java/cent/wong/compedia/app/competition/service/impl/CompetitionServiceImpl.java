@@ -4,14 +4,17 @@ import cent.wong.compedia.app.competition.repository.CompetitionRepository;
 import cent.wong.compedia.app.competition.service.CompetitionService;
 import cent.wong.compedia.app.interest.repository.CompetitionInterestTypeRepository;
 import cent.wong.compedia.app.interest.repository.InterestRepository;
+import cent.wong.compedia.app.university.repository.UniversityRepository;
 import cent.wong.compedia.constant.ColorConstant;
 import cent.wong.compedia.constant.ErrorCode;
 import cent.wong.compedia.entity.*;
 import cent.wong.compedia.entity.dto.competition.*;
+import cent.wong.compedia.entity.dto.university.GetUniversityReq;
 import cent.wong.compedia.mapper.CompetitionMapper;
 import cent.wong.compedia.util.AuthenticationUtil;
 import cent.wong.compedia.util.CloudinaryUtil;
 import cent.wong.compedia.util.DateUtil;
+import cent.wong.entity.Pagination;
 import cent.wong.json.JsonUtil;
 import com.cloudinary.Cloudinary;
 import com.cloudinary.utils.ObjectUtils;
@@ -33,6 +36,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -57,6 +61,8 @@ public class CompetitionServiceImpl implements CompetitionService {
     private final JsonUtil jsonUtil;
 
     private final DateUtil dateUtil;
+
+    private final UniversityRepository universityRepository;
 
     private final InterestRepository interestRepository;
 
@@ -113,7 +119,7 @@ public class CompetitionServiceImpl implements CompetitionService {
     }
 
     @Override
-    public Mono<BaseResponse<GetCompetitionRes>> get(GetCompetitionReq req) {
+    public Mono<BaseResponse<GetCompetitionDetailRes>> get(GetCompetitionReq req) {
         GetCompetitionInterestTypeReq getCompetitionInterestTypeReq = new GetCompetitionInterestTypeReq();
         getCompetitionInterestTypeReq.setFkCompetitionId(req.getId());
         getCompetitionInterestTypeReq.setIds(req.getIds());
@@ -125,7 +131,7 @@ public class CompetitionServiceImpl implements CompetitionService {
 
         req.setIsActive(true);
 
-        return  competitionInterestTypeList.map((competitionInterestType) -> competitionInterestType.stream().map(CompetitionInterestType::getFkCompetitionId).toList())
+        return competitionInterestTypeList.map((competitionInterestType) -> competitionInterestType.stream().map(CompetitionInterestType::getFkCompetitionId).toList())
                 .flatMap((listFkCompetitionId) -> {
                     req.setIds(listFkCompetitionId);
                     return this.competitionRepository.get(req);
@@ -141,12 +147,26 @@ public class CompetitionServiceImpl implements CompetitionService {
                     // find interest type too
                     Mono<List<InterestType>> type = this.interestRepository.getAllInterestType();
 
-                    return time.zipWith(type)
+                    Mono<University> getUniversity = this.universityRepository.get(
+                            GetUniversityReq
+                                    .builder()
+                                    .id(1L) // TODO: change this when the UI is exist!
+                                    .pgParam(new Pagination.PaginationParam())
+                                    .build()
+                    );
+
+                    return Mono.zip(
+                                time,
+                                type,
+                                getUniversity
+                            )
                             .map((t2) -> {
                                 List<InterestTime> interestTimes = t2.getT1();
                                 List<InterestType> interestTypes = t2.getT2();
-                                return convertFromCompetition(
+                                University university = t2.getT3();
+                                return convertToDetailFromCompetition(
                                         competition,
+                                        university,
                                         interestTypes,
                                         interestTimes
                                 );
@@ -158,6 +178,51 @@ public class CompetitionServiceImpl implements CompetitionService {
                     log.error("error occurred with message: {}", e);
                     return Mono.just(BaseResponse.sendError(tracer, ErrorCode.INTERNAL_SERVER_ERROR.getErrCode(), e.getMessage()));
                 });
+    }
+
+    private GetCompetitionDetailRes convertToDetailFromCompetition(
+            Competition competition,
+            University university,
+            List<InterestType> interestTypes,
+            List<InterestTime> interestTimes
+    ){
+        GetCompetitionDetailRes detail = new GetCompetitionDetailRes();
+        detail.setId(competition.getId());
+        detail.setName(competition.getName());
+        detail.setImage(competition.getImage());
+        detail.setDeadline(dateUtil.convertIntoString(competition.getDeadline()));
+        detail.setPrice(competition.getPrice());
+        detail.setUniversityName(university.getName());
+        detail.setPublishedBy(university.getName());
+
+        interestTimes.forEach((times) -> {
+            if(times.getId() == competition.getFkInterestTimeId()){
+                detail.setLocation(times.getTime());
+            }
+        });
+
+        List<String> resType = new ArrayList<>();
+
+        competition.getFkInterestTypeId()
+                .forEach((types) -> {
+                    interestTypes.forEach((interestType) -> {
+                        if(types == interestType.getId()){
+                            resType.add(interestType.getType());
+                        }
+                    });
+                });
+
+        detail.setType(resType);
+        detail.setDescription("Lorem ipsum dolor sit amet consectetur. Nunc proin nunc at non nisl gravida vel cursus dapibus. Ipsum quis sodales arcu dolor. Sollicitudin sit nec tristique aenean dignissim maecenas morbi aliquam. Sit sed sodales sed proin vitae semper fermentum volutpat");
+        detail.setWinnerPrize(
+                Map.ofEntries(
+                        Map.entry("Juara 1", "Rp.5.000.000"),
+                        Map.entry("Juara 2", "Rp.3.000.000"),
+                        Map.entry("Juara 3", "Rp.1.500.000")
+                )
+        );
+        detail.setGuidebookLink("https://www.google.com");
+        return detail;
     }
 
     // TODO: the logic is not efficient, change the algorithm later!
@@ -202,8 +267,11 @@ public class CompetitionServiceImpl implements CompetitionService {
             Long differenceDay = ChronoUnit.DAYS.between(deadline, now) / -1;
             res.setDaySinceDeadline(String.valueOf(differenceDay));
 
-            // TODO: set the color of the deadline
-            res.setDaySinceDeadlineColor(null);
+            if(differenceDay > 7){
+                res.setDaySinceDeadlineColor(ColorConstant.RED);
+            } else {
+                res.setDaySinceDeadlineColor(ColorConstant.GREEN);
+            }
         }
 
         return res;
