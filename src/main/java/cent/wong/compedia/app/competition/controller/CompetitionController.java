@@ -19,16 +19,14 @@ import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
 @RestController
-@RequestMapping("/private")
 @RequiredArgsConstructor
-@SecurityRequirement(name = "JWT")
 @Tag(name = "Competition")
 public class CompetitionController {
 
     private final CompetitionService competitionService;
 
     @PostMapping(
-            value = "/v1/competition/save",
+            value = "/public/v1/competition/save",
             consumes = MediaType.MULTIPART_FORM_DATA_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE
     )
@@ -43,7 +41,7 @@ public class CompetitionController {
                 .subscribeOn(Schedulers.boundedElastic());
     }
 
-    @PostMapping("/v1/competition/get")
+    @PostMapping("/public/v1/competition/get")
     @Operation(description = "Get competition")
     public Mono<ResponseEntity<BaseResponse<GetCompetitionDetailRes>>> get(
             @RequestBody GetCompetitionReq req
@@ -53,7 +51,7 @@ public class CompetitionController {
                 .subscribeOn(Schedulers.boundedElastic());
     }
 
-    @PostMapping("/v1/competition/get/list")
+    @PostMapping("/public/v1/competition/get/list")
     @Operation(description = "Get list competition")
     public Mono<ResponseEntity<BaseResponse<PaginationRes<GetCompetitionRes>>>> getList(
             @RequestBody GetCompetitionReq req
@@ -64,10 +62,11 @@ public class CompetitionController {
     }
 
     @PostMapping(
-            value = "/v1/competition/update/{id}",
+            value = "/private/v1/competition/update/{id}",
             consumes = MediaType.MULTIPART_FORM_DATA_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE
     )
+    @SecurityRequirement(name = "JWT")
     @Operation(description = "Update competition")
     public Mono<ResponseEntity<BaseResponse<Object>>> update(
             Authentication authentication,
@@ -82,7 +81,8 @@ public class CompetitionController {
                 .subscribeOn(Schedulers.boundedElastic());
     }
 
-    @PostMapping("/v1/competition/get/delete/{id}")
+    @PostMapping("/private/v1/competition/get/delete/{id}")
+    @SecurityRequirement(name = "JWT")
     @Operation(description = "Delete competition")
     public Mono<ResponseEntity<BaseResponse<Object>>> delete(
             Authentication authentication,
@@ -95,7 +95,8 @@ public class CompetitionController {
                 .subscribeOn(Schedulers.boundedElastic());
     }
 
-    @PostMapping("/v1/competition/get/activate/{id}")
+    @PostMapping("/private/v1/competition/get/activate/{id}")
+    @SecurityRequirement(name = "JWT")
     @Operation(description = "Activate competition")
     public Mono<ResponseEntity<BaseResponse<Object>>> activate(
             Authentication authentication,

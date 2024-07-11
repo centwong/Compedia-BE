@@ -1,11 +1,13 @@
 package cent.wong.compedia.app.competition.service.impl;
 
 import cent.wong.compedia.app.competition.repository.CompetitionRepository;
+import cent.wong.compedia.app.competition.repository.CompetitionTrackerRepository;
 import cent.wong.compedia.app.competition.service.CompetitionService;
 import cent.wong.compedia.app.interest.repository.CompetitionInterestTypeRepository;
 import cent.wong.compedia.app.interest.repository.InterestRepository;
 import cent.wong.compedia.app.university.repository.UniversityRepository;
 import cent.wong.compedia.constant.ColorConstant;
+import cent.wong.compedia.constant.CompetitionPaidStatus;
 import cent.wong.compedia.constant.ErrorCode;
 import cent.wong.compedia.entity.*;
 import cent.wong.compedia.entity.dto.competition.*;
@@ -14,11 +16,14 @@ import cent.wong.compedia.mapper.CompetitionMapper;
 import cent.wong.compedia.util.AuthenticationUtil;
 import cent.wong.compedia.util.CloudinaryUtil;
 import cent.wong.compedia.util.DateUtil;
+import cent.wong.compedia.util.MidtransUtil;
 import cent.wong.entity.Pagination;
 import cent.wong.json.JsonUtil;
 import com.cloudinary.Cloudinary;
 import com.cloudinary.utils.ObjectUtils;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.midtrans.httpclient.SnapApi;
+import com.midtrans.httpclient.error.MidtransError;
 import io.micrometer.tracing.Tracer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -37,6 +42,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -68,15 +74,23 @@ public class CompetitionServiceImpl implements CompetitionService {
 
     private final CompetitionInterestTypeRepository competitionInterestRepository;
 
+    private final CompetitionTrackerRepository competitionTrackerRepository;
+
     @Override
     public Mono<BaseResponse<SaveUpdateCompetitionRes>> save(Authentication authentication, SaveUpdateCompetitionReq req, Mono<FilePart> file) {
         Competition competition = competitionMapper.save(req);
         competition.setCreatedAt(Instant.now().toEpochMilli());
-        competition.setCreatedBy(authenticationUtil.extractId(authentication));
+//        competition.setCreatedBy(null); not used since now the competition can made by public
         competition.setFkInterestTypeIds(jsonUtil.writeValueAsString(req.getFkInterestTypeIds()));
-        competition.setFkUserId(authenticationUtil.extractId(authentication));
+//        competition.setFkUserId(authenticationUtil.extractId(authentication)); not used since now the competition can made by public
         competition.setFkInterestTimeId(req.getFkInterestTimeId());
         competition.setIsActive(true);
+
+        if(req.getIsRegistrationPaid()){
+            competition.setCompetitionPaidStatus(CompetitionPaidStatus.NOT_PAID.getStatus());
+        } else {
+            competition.setCompetitionPaidStatus(CompetitionPaidStatus.FREE.getStatus());
+        }
 
         // file is supposed to be not null!
         Mono<CloudinaryResponse> uploadImage = file.flatMap((f) ->
@@ -109,13 +123,61 @@ public class CompetitionServiceImpl implements CompetitionService {
                                                     .collectList()
                                     )
                                     .map(Tuple2::getT1)
-                                    .map((data) -> BaseResponse.<SaveUpdateCompetitionRes>sendSuccess(tracer));
+                                    .flatMap((competition1) -> saveCompetitionTracker(competition.getId()))
+                                    .flatMap((competitionTracker) -> {
+                                        SaveUpdateCompetitionRes res = new SaveUpdateCompetitionRes();
+                                        res.setUniqueId(competitionTracker.getId());
+                                        res.setPaymentId(competitionTracker.getUniqueId());
+
+                                        if(req.getIsRegistrationPaid()){
+                                            return createPayment(competition, competitionTracker, req.getPaymentAmount())
+                                                    .map((paymentResult) -> {
+                                                        res.setPaymentUri(paymentResult.getRedirectUrl());
+                                                        return res;
+                                                    });
+                                        } else {
+                                            return Mono.just(res);
+                                        }
+                                    })
+                                    .map((data) -> BaseResponse.<SaveUpdateCompetitionRes>sendSuccess(tracer, data));
                         }
                 )
                 .onErrorResume((e) -> {
                     log.error("error occurred with message: {}", e);
                     return Mono.just(BaseResponse.sendError(tracer, ErrorCode.INTERNAL_SERVER_ERROR.getErrCode(), e.getMessage()));
                 });
+    }
+
+    private Mono<CompetitionTracker> saveCompetitionTracker(Long competitionId){
+        CompetitionTracker competitionTracker = new CompetitionTracker();
+        competitionTracker.setCompetitionId(competitionId);
+        competitionTracker.setUniqueId(UUID.randomUUID().toString());
+        return competitionTrackerRepository.save(competitionTracker);
+    }
+
+    private Mono<MidtransSnapURI> createPayment(Competition competition, CompetitionTracker competitionTracker, Long totalPayment){
+        String transactionToken = null;
+        try {
+            transactionToken = SnapApi.createTransactionToken(
+                    MidtransUtil.generateSnapData(
+                            TransactionDetails
+                                    .builder()
+                                    .grossAmount(totalPayment)
+                                    .orderId(competitionTracker.getUniqueId())
+                                    .build(),
+                            CustomerDetails
+                                    .builder()
+                                    .email(competition.getPublisherEmail())
+                                    .firstName(competition.getPublisherName())
+                                    .build()
+                    ).convertIntoMap()
+            );
+            MidtransSnapURI uri = new MidtransSnapURI();
+            uri.setRedirectUrl(String.format("https://app.sandbox.midtrans.com/snap/v2/vtweb/%s", transactionToken));
+            return Mono.just(uri);
+        } catch (MidtransError e) {
+            return Mono.error(e);
+        }
     }
 
     @Override
