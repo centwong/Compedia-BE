@@ -1,0 +1,2 @@
+INSERT INTO `user`(email, password, name, fk_university_id, role, created_at, is_active) VALUES
+('admin@gmail.com', '$2a$10$khFEhaVwUxPS1Qok1OgjEusjXQZSvMZI3yzoQNTs9/ATuRf3MqIJ6', 'centwong', -1, 3, UNIX_TIMESTAMP(CURRENT_TIMESTAMP), true);

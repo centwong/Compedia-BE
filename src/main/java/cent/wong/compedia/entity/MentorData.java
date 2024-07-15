@@ -28,6 +28,15 @@ public class MentorData implements Serializable {
     @Column("instagram_url")
     private String instagramUrl;
 
+    @Column("job_title")
+    private String jobTitle;
+
+    @Column("mentoring_scope")
+    private String mentoringScope;
+
+    @Column("tnc_description")
+    private String tncDescription;
+
     @Column("approval_status")
     private Long approvalStatus;
 

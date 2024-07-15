@@ -28,4 +28,7 @@ public interface UserMapper {
     User updateUser(UpdateUserReq req, @MappingTarget User user);
 
     MentorData saveMentorData(SaveMentorDataReq req);
+
+
+    MentorData updateMentorDataDetail(MentorUpdateDetailReq req, @MappingTarget MentorData mentorData);
 }

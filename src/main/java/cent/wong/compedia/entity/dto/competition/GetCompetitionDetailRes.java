@@ -4,7 +4,6 @@ import lombok.Data;
 
 import java.io.Serializable;
 import java.util.List;
-import java.util.Map;
 
 @Data
 public class GetCompetitionDetailRes implements Serializable {
@@ -29,7 +28,13 @@ public class GetCompetitionDetailRes implements Serializable {
 
     private String universityName;
 
-    private Map<String, String> winnerPrize;
+    private String winnerPrize;
 
     private String guidebookLink;
+
+    private Long competitionFee;
+
+    private String linkCompetitionRegistration;
+
+    private Boolean isClosed;
 }

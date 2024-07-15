@@ -29,5 +29,11 @@ public class GetCompetitionReq implements Serializable {
     @ParamColumn(name = "is_active")
     private Boolean isActive;
 
+    @ParamColumn(name = "competition_paid_status")
+    private Long competitionPaidStatus;
+
+    @ParamColumn(name = "competition_paid_status")
+    private List<Long> competitionPaidStatuses;
+
     private Pagination.PaginationParam pgParam = new Pagination.PaginationParam();
 }
