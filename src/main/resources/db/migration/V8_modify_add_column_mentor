@@ -1,0 +1,4 @@
+ALTER TABLE `mentor_data`
+ADD COLUMN `job_title` TEXT,
+ADD COLUMN `mentoring_scope` TINYINT,
+ADD COLUMN `tnc_description` TEXT;

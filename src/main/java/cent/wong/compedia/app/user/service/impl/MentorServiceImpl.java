@@ -9,16 +9,20 @@ import cent.wong.compedia.constant.ErrorCode;
 import cent.wong.compedia.constant.ApprovalStatus;
 import cent.wong.compedia.constant.RoleConstant;
 import cent.wong.compedia.entity.*;
+import cent.wong.compedia.entity.dto.interest.GetInterestReq;
 import cent.wong.compedia.entity.dto.mentor.GetMentorDataReq;
 import cent.wong.compedia.entity.dto.mentor.GetMentorDetailRes;
+import cent.wong.compedia.entity.dto.mentor.GetMentorReq;
 import cent.wong.compedia.entity.dto.mentor.GetMentorRes;
 import cent.wong.compedia.entity.dto.user.GetUserReq;
 import cent.wong.compedia.entity.dto.user.MentorUpdateApprovalReq;
+import cent.wong.compedia.entity.dto.user.MentorUpdateDetailReq;
 import cent.wong.compedia.entity.dto.user.SaveMentorDataReq;
 import cent.wong.compedia.mapper.UserMapper;
 import cent.wong.compedia.util.AuthenticationUtil;
 import cent.wong.entity.Pagination;
 import cent.wong.json.JsonUtil;
+import com.fasterxml.jackson.core.type.TypeReference;
 import io.micrometer.tracing.Tracer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -153,29 +157,13 @@ public class MentorServiceImpl implements MentorService {
         return getUser.flatMap((user) -> {
             getMentorDetailRes.setId(user.getId());
             getMentorDetailRes.setName(user.getName());
-            getMentorDetailRes.setRole("Backend Developer"); // TODO: change when the form implementation exist
             return this.mentorDataRepository.findByFkUserId(user.getId());
         })
         .map((mentorData) -> {
-            // TODO: change this when the form implementation exist!
-            getMentorDetailRes.setMentoringScope(List.of(
-                    "Untuk Pemula",
-                    "Untuk Menengah",
-                    "Untuk Senior"
-            ));
-
-            // TODO: change this when the form implementation exist!
-            getMentorDetailRes.setNotes(List.of(
-                    "Link meet untuk mentoring akan saya provide",
-                    "Mohon hadir paling lambat 10 menit sebelum jadwal mentoring ya!"
-            ));
-
-            // TODO: change this when the form implementation exist!
-            getMentorDetailRes.setAchievement(List.of(
-                    "Junior Backend Developer @ByteDance",
-                    "Juara 1 Hackfest Google 2023"
-            ));
-
+            getMentorDetailRes.setMentoringScope(mentorData.getMentoringScope());
+            getMentorDetailRes.setRole(mentorData.getJobTitle());
+            getMentorDetailRes.setNotes(mentorData.getTncDescription());
+            getMentorDetailRes.setAchievement(mentorData.getAchievement());
             getMentorDetailRes.setDescription(mentorData.getDescription());
             getMentorDetailRes.setInstagramLink(mentorData.getInstagramUrl());
             getMentorDetailRes.setLinkedinLink(mentorData.getLinkedinUrl());
@@ -206,8 +194,11 @@ public class MentorServiceImpl implements MentorService {
 
     @Cacheable("mentor:list")
     @Override
-    public Mono<BaseResponse<PaginationRes<GetMentorRes>>> getList(GetUserReq getReq) {
+    public Mono<BaseResponse<PaginationRes<GetMentorRes>>> getList(Authentication authentication) {
+        GetMentorReq getReq = new GetMentorReq();
+        getReq.setId(authenticationUtil.extractId(authentication));
         log.info("accepting getList mentor req: {}", jsonUtil.writeValueAsString(getReq));
+
         Mono<PaginationRes<User>> getListUser = this.userRepository
                 .getList(
                         GetUserReq
@@ -216,7 +207,54 @@ public class MentorServiceImpl implements MentorService {
                                 .isActive(true)
                                 .pgParam(new Pagination.PaginationParam())
                                 .build()
-                );
+                )
+                .zipWith(
+                        this.interestRepository.get(
+                            GetInterestReq
+                                    .builder()
+                                    .fkUserId(authenticationUtil.extractId(authentication))
+                                    .build())
+                )
+                .flatMap((t2) -> {
+                    List<Long> interestTypesUser = jsonUtil.readValue(
+                            t2.getT2().getFkInterestTypeIds(), new TypeReference<>() {}
+                    );
+                    List<User> users = t2.getT1().getList();
+
+                    List<User> filteredMentor = new ArrayList<>();
+                    var res = Flux.fromIterable(users)
+                            .flatMap((user) -> {
+                                return this.interestRepository.get(
+                                        GetInterestReq
+                                                .builder()
+                                                .fkUserId(user.getId())
+                                                .build()
+                                )
+                                .map((interestMentor) -> {
+                                    return jsonUtil.readValue(
+                                            interestMentor.getFkInterestTypeIds(),
+                                            new TypeReference<List<Long>>() {}
+                                    );
+                                })
+                                .map((interestMentorIds) -> {
+                                    for(Long idInterestMentor: interestMentorIds){
+                                        for(Long idInterestUser: interestTypesUser){
+                                            // if the interest is same, then show it as recommendation
+                                            if(idInterestMentor == idInterestUser){
+                                                filteredMentor.add(user);
+                                            }
+                                        }
+                                    }
+
+                                    return interestMentorIds;
+                                });
+                            });
+
+                    // change the detailed data in list mentor
+                    t2.getT1().setList(filteredMentor);
+
+                    return res.then(Mono.just(t2.getT1()));
+                });
 
         return getListUser
                 .flatMap((pgUser) -> {
@@ -313,6 +351,31 @@ public class MentorServiceImpl implements MentorService {
                             });
                     return saveMentorData.zipWith(getAndUpdateUser)
                             .map(Tuple2::getT1);
+                })
+                .map((mentorData) -> BaseResponse.sendSuccess(tracer))
+                .switchIfEmpty(Mono.just(BaseResponse.sendError(tracer, ErrorCode.MENTOR_DATA_NOT_FOUND.getErrCode(), ErrorCode.MENTOR_DATA_NOT_FOUND.getMessage())))
+                .onErrorResume((e) -> {
+                    log.error("error occurred with message: {}", e);
+                    return Mono.just(BaseResponse.sendError(tracer, ErrorCode.INTERNAL_SERVER_ERROR.getErrCode(), e.getMessage()));
+                });
+    }
+
+    @CacheEvict(value = {
+            "mentor:data:get",
+            "mentor:detail",
+            "mentor:list"
+    }, allEntries = true)
+    @Override
+    public Mono<BaseResponse<Object>> updateMentorDetail(Authentication authentication, MentorUpdateDetailReq req) {
+        MentorData exampleBody = new MentorData();
+        exampleBody.setFkUserId(authenticationUtil.extractId(authentication));
+        return this.mentorDataRepository
+                .findOne(Example.of(exampleBody))
+                .map((mentorData) -> {
+                    MentorData updatedData = this.userMapper.updateMentorDataDetail(
+                            req, mentorData
+                    );
+                    return this.mentorDataRepository.save(updatedData);
                 })
                 .map((mentorData) -> BaseResponse.sendSuccess(tracer))
                 .switchIfEmpty(Mono.just(BaseResponse.sendError(tracer, ErrorCode.MENTOR_DATA_NOT_FOUND.getErrCode(), ErrorCode.MENTOR_DATA_NOT_FOUND.getMessage())))

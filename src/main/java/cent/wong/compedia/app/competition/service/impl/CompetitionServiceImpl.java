@@ -41,7 +41,6 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -80,9 +79,7 @@ public class CompetitionServiceImpl implements CompetitionService {
     public Mono<BaseResponse<SaveUpdateCompetitionRes>> save(Authentication authentication, SaveUpdateCompetitionReq req, Mono<FilePart> file) {
         Competition competition = competitionMapper.save(req);
         competition.setCreatedAt(Instant.now().toEpochMilli());
-//        competition.setCreatedBy(null); not used since now the competition can made by public
         competition.setFkInterestTypeIds(jsonUtil.writeValueAsString(req.getFkInterestTypeIds()));
-//        competition.setFkUserId(authenticationUtil.extractId(authentication)); not used since now the competition can made by public
         competition.setFkInterestTimeId(req.getFkInterestTimeId());
         competition.setIsActive(true);
 
@@ -256,11 +253,11 @@ public class CompetitionServiceImpl implements CompetitionService {
         detail.setDeadline(dateUtil.convertIntoString(competition.getDeadline()));
         detail.setPrice(competition.getPrice());
         detail.setUniversityName(university.getName());
-        detail.setPublishedBy(university.getName());
+        detail.setPublishedBy(competition.getPublisherName());
 
         interestTimes.forEach((times) -> {
             if(times.getId() == competition.getFkInterestTimeId()){
-                detail.setLocation(times.getTime());
+                detail.setLocation(times.getTime() + "-" + competition.getCityName());
             }
         });
 
@@ -275,16 +272,21 @@ public class CompetitionServiceImpl implements CompetitionService {
                     });
                 });
 
+        Instant deadline = Instant.ofEpochMilli(competition.getDeadline());
+        Instant now = Instant.now();
+
+        if(deadline.isBefore(now)){
+            detail.setIsClosed(true);
+        } else {
+            detail.setIsClosed(false);
+        }
+
         detail.setType(resType);
-        detail.setDescription("Lorem ipsum dolor sit amet consectetur. Nunc proin nunc at non nisl gravida vel cursus dapibus. Ipsum quis sodales arcu dolor. Sollicitudin sit nec tristique aenean dignissim maecenas morbi aliquam. Sit sed sodales sed proin vitae semper fermentum volutpat");
-        detail.setWinnerPrize(
-                Map.ofEntries(
-                        Map.entry("Juara 1", "Rp.5.000.000"),
-                        Map.entry("Juara 2", "Rp.3.000.000"),
-                        Map.entry("Juara 3", "Rp.1.500.000")
-                )
-        );
-        detail.setGuidebookLink("https://www.google.com");
+        detail.setDescription(competition.getDescription());
+        detail.setWinnerPrize(competition.getPrizePool());
+        detail.setGuidebookLink(competition.getLinkGuidebook());
+        detail.setCompetitionFee(competition.getCompetitionFee());
+        detail.setLinkCompetitionRegistration(competition.getLinkCompetitionRegistration());
         return detail;
     }
 
@@ -303,7 +305,7 @@ public class CompetitionServiceImpl implements CompetitionService {
 
         interestTimes.forEach((times) -> {
             if(times.getId() == competition.getFkInterestTimeId()){
-                res.setLocation(times.getTime());
+                res.setLocation(times.getTime() + "-" + competition.getCityName());
             }
         });
 
@@ -326,9 +328,11 @@ public class CompetitionServiceImpl implements CompetitionService {
         if(deadline.isBefore(now)){
             res.setDaySinceDeadline("Sudah Tutup");
             res.setDaySinceDeadlineColor(ColorConstant.RED);
+            res.setIsClosed(true);
         } else {
             Long differenceDay = ChronoUnit.DAYS.between(deadline, now) / -1;
             res.setDaySinceDeadline(String.valueOf(differenceDay));
+            res.setIsClosed(false);
 
             if(differenceDay > 7){
                 res.setDaySinceDeadlineColor(ColorConstant.RED);
@@ -356,6 +360,10 @@ public class CompetitionServiceImpl implements CompetitionService {
         return competitionInterestTypeList.map((competitionInterestType) -> competitionInterestType.stream().map(CompetitionInterestType::getFkCompetitionId).toList())
                 .flatMap((listFkCompetitionId) -> {
                     req.setIds(listFkCompetitionId);
+                    req.setCompetitionPaidStatuses(List.of(
+                            CompetitionPaidStatus.FREE.getStatus(),
+                            CompetitionPaidStatus.PAID.getStatus()
+                    ));
                     return this.competitionRepository.getList(req);
                 })
                 .map((data) -> {

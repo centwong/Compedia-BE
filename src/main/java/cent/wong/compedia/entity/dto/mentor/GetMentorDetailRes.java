@@ -22,9 +22,9 @@ public class GetMentorDetailRes implements Serializable {
 
     private String description;
 
-    private List<String> achievement;
+    private String achievement;
 
-    private List<String> mentoringScope;
+    private String mentoringScope;
 
-    private List<String> notes;
+    private String notes;
 }

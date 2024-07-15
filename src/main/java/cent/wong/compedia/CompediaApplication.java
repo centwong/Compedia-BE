@@ -18,6 +18,7 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.security.config.annotation.method.configuration.EnableReactiveMethodSecurity;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import reactor.core.publisher.Hooks;
 
 @SpringBootApplication(scanBasePackageClasses = {

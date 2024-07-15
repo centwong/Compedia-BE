@@ -25,4 +25,6 @@ public class GetCompetitionRes implements Serializable {
     private String image;
 
     private List<String> type;
+
+    private Boolean isClosed;
 }

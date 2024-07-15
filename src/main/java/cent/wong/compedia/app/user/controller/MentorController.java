@@ -6,10 +6,10 @@ import cent.wong.compedia.entity.MentorData;
 import cent.wong.compedia.entity.PaginationRes;
 import cent.wong.compedia.entity.dto.mentor.GetMentorDataReq;
 import cent.wong.compedia.entity.dto.mentor.GetMentorDetailRes;
-import cent.wong.compedia.entity.dto.mentor.GetMentorReq;
 import cent.wong.compedia.entity.dto.mentor.GetMentorRes;
 import cent.wong.compedia.entity.dto.user.GetUserReq;
 import cent.wong.compedia.entity.dto.user.MentorUpdateApprovalReq;
+import cent.wong.compedia.entity.dto.user.MentorUpdateDetailReq;
 import cent.wong.compedia.entity.dto.user.SaveMentorDataReq;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -93,9 +93,9 @@ public class MentorController {
     @PostMapping("/v1/mentor/list")
     @Operation(description = "Get list mentor")
     public Mono<ResponseEntity<BaseResponse<PaginationRes<GetMentorRes>>>> getList(
-            @RequestBody GetUserReq req
+            Authentication authentication
             ){
-        return this.mentorService.getList(req)
+        return this.mentorService.getList(authentication)
                 .map(ResponseEntity::ok)
                 .subscribeOn(Schedulers.boundedElastic());
     }
@@ -106,6 +106,17 @@ public class MentorController {
             @RequestBody GetUserReq req
     ){
         return this.mentorService.getMentorDetail(req)
+                .map(ResponseEntity::ok)
+                .subscribeOn(Schedulers.boundedElastic());
+    }
+
+    @PostMapping("/v1/mentor/data/update/detail")
+    @Operation(description = "Update mentor detail after success save it's data and approved")
+    public Mono<ResponseEntity<BaseResponse<Object>>> updateMentorDetail(
+            Authentication authentication,
+            @RequestBody @Valid MentorUpdateDetailReq req
+            ){
+        return this.mentorService.updateMentorDetail(authentication, req)
                 .map(ResponseEntity::ok)
                 .subscribeOn(Schedulers.boundedElastic());
     }
